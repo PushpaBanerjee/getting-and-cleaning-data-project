@@ -5,9 +5,9 @@
 
 # download (if neccessary) and extract the data we need
 if(!file.exists("UCI HAR Dataset")){
-  furl <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
-  download.file(furl,dest="smartphone_data.zip",method="curl")
-  unzip("smartphone_data.zip")
+    furl <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
+    download.file(furl,dest="smartphone_data.zip",method="curl")
+    unzip("smartphone_data.zip")
 }
 
 X.train <- read.table("UCI HAR Dataset/train/X_train.txt")
