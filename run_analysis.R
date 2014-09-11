@@ -1,78 +1,75 @@
 # Getting and Cleaning Data Course Project
-# RPrice 05.24.2014 
-# Data info:
-# http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphones
 
-# download (if neccessary) and extract the data we need
-if(!file.exists("UCI HAR Dataset")){
-    furl <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
-    download.file(furl,dest="smartphone_data.zip",method="curl")
-    unzip("smartphone_data.zip")
+library(base)
+library(utils)
+library(data.table)
+
+# The function downloads the Samsung data and extracts it
+download.data <- function () {
+    zip.url <- 'https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip'
+    zip.file <- 'dataset.zip'
+    
+    download.file(zip.url, destfile = zip.file, method = 'curl')
+    unzip(zip.file)
 }
 
-X.train <- read.table("UCI HAR Dataset/train/X_train.txt")
-y.train <- read.table("UCI HAR Dataset/train/y_train.txt")
-subject.train <- read.table("UCI HAR Dataset/train/subject_train.txt")
-X.test <- read.table("UCI HAR Dataset/test/X_test.txt")
-y.test <- read.table("UCI HAR Dataset/test/y_test.txt")
-subject.test <- read.table("UCI HAR Dataset/test/subject_test.txt")
-features <- read.table("UCI HAR Dataset/features.txt",stringsAsFactors=F)
-activity.labels <- read.table("UCI HAR Dataset/activity_labels.txt",stringsAsFactors=F)
+# The function loads and processes either a train or a test data set,
+# given that current directory is the Samsung data set.
+load.dataset <- function (set, features, labels) {
+    # Construct the relative pathes of data files
+    prefix <- paste(set, '/', sep = '')
+    file.data <- paste(prefix, 'X_', set, '.txt', sep = '')
+    file.label <- paste(prefix, 'y_', set, '.txt', sep = '')
+    file.subject <- paste(prefix, 'subject_', set, '.txt', sep = '')
+    
+    # Cannot load the data using fread() function.
+    # fread() fails to determine the correct number of columns in dataset.
+    # So we read the data into a data.frame and then transform it into data.table
+    data <- read.table(file.data)[, features$index]
+    names(data) <- features$name
+    
+    label.set <- read.table(file.label)[, 1]
+    data$label <- factor(label.set, levels=labels$level, labels=labels$label)
+    
+    subject.set <- read.table(file.subject)[, 1]
+    data$subject <- factor(subject.set)
+    
+    # convert to data table
+    data.table(data)
+}
 
-# combine train and test sets, attaching names to labels and subject id columns
-# this chunk tackles part 1 of the assignment
-# 1) Merges the training and the test sets to create one data set.
-X <- rbind(X.train,X.test); colnames(X) <- features$V2
-# later we will add y (activity) and subject id columns
-
-# part 2 says:
-# 2) Extracts only the measurements on the mean and standard deviation for each measurement.
-mean.std.dataset <- X[,grepl('mean\\(\\)|std\\(\\)',colnames(X))]
-# now lets add actvity and subject id to the reduced data set
-y <- rbind(y.train,y.test) 
-colnames(y) <- "activity"
-subject <- rbind(subject.train,subject.test)
-colnames(subject) <- "subject.id"
-mean.std.dataset <- cbind(subject, y, mean.std.dataset)
-
-# part 3 says:
-# Uses descriptive activity names to name the activities in the data set
-mean.std.dataset$activity <- factor(mean.std.dataset$activity,labels=activity.labels$V2)
-
-# part 4 says:
-# Appropriately labels the data set with descriptive activity names.
-#
-# take a look at the current names
-names(mean.std.dataset)
-# lets replace all '-' with a '.'
-names(mean.std.dataset) <- gsub("\\-","",names(mean.std.dataset),)
-# replace all the beginning 't' and 'f' with time and freq
-names(mean.std.dataset) <- gsub('^t','time.',names(mean.std.dataset),)
-names(mean.std.dataset) <- gsub('^f','freq.',names(mean.std.dataset),)
-# lets strip off all trailing '()'
-names(mean.std.dataset) <- sub("\\(\\)$","",names(mean.std.dataset),)
-names(mean.std.dataset) <- sub("\\(\\)",".",names(mean.std.dataset),)
-# change Acc and Mag to be slightly more descriptive
-names(mean.std.dataset) <- gsub("Mag","magnitude.",names(mean.std.dataset),)
-names(mean.std.dataset) <- gsub("Acc","acceleration.",names(mean.std.dataset),)
-# clean up remaining words by inputing spaces
-names(mean.std.dataset) <- gsub("Body","body.",names(mean.std.dataset),)
-names(mean.std.dataset) <- gsub("Gyro","gyro.",names(mean.std.dataset),)
-names(mean.std.dataset) <- gsub("Jerk","jerk.",names(mean.std.dataset),)
-names(mean.std.dataset) <- gsub("Gravity","gravity.",names(mean.std.dataset),)
-# convert the remaining caps to lowercase
-names(mean.std.dataset) <- tolower(names(mean.std.dataset))
-
-# part 5 says:
-# 5) Creates a second, independent tidy data set with the average of each 
-# variable for each activity and each subject. 
-library(reshape2)
-melted <- melt(mean.std.dataset, id=c('subject.id','activity'))
-casted <- dcast(melted, subject.id + activity ~ variable, fun.aggregate=mean)
-# modify variable names to reflect that these are now averaged values
-new.names<-lapply(names(casted)[3:ncol(casted)],paste,".averaged", sep="")
-names(casted)[3:ncol(casted)] <- unlist(new.names)
-
-# finally...
-# save the small tidy dataset for evaluation
-write.table(casted, file="tidy_data.txt")
+run.analysis <- function () {
+    setwd('UCI HAR Dataset/')
+    
+    # Get the features
+    feature.set <- read.table('features.txt', col.names = c('index', 'name'))
+    features <- subset(feature.set, grepl('-(mean|std)[(]', feature.set$name))
+    
+    # Get the labels
+    label.set <- read.table('activity_labels.txt', col.names = c('level', 'label'))
+    
+    # Read train and test data sets
+    train.set <- load.dataset('train', features, label.set)
+    test.set <- load.dataset('test', features, label.set)
+    
+    # The raw data set
+    dataset <- rbind(train.set, test.set)
+    
+    # Generate the tidy data set
+    tidy.dataset <- dataset[, lapply(.SD, mean), by=list(label, subject)]
+    # Fix the variable names
+    names <- names(tidy.dataset)
+    names <- gsub('-mean', 'Mean', names) # Replace `-mean' by `Mean'
+    names <- gsub('-std', 'Std', names) # Replace `-std' by 'Std'
+    names <- gsub('[()-]', '', names) # Remove the parenthesis and dashes
+    names <- gsub('BodyBody', 'Body', names) # Replace `BodyBody' by `Body'
+    setnames(tidy.dataset, names)
+    
+    # Write the raw and the tidy data sets to files
+    setwd('..')
+    write.csv(dataset, file = 'rawdata.csv', row.names = FALSE)
+    write.csv(tidy.dataset, file = 'tidydata.csv',
+              row.names = FALSE, quote = FALSE)
+    
+    # Return the tidy data set
+    tidy.dataset
