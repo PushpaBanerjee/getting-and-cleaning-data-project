@@ -17,7 +17,7 @@ Included in this repo are:
 
 	run_analysis.R - the main script from producing the tidy data set
 	codebook.md - descibes the original dataset, the variables in the tidy data   set and transformations used to obtain them
-	tidy_data.txt (not required but here in case of online submission problems)
+	tidy_data.csv (not required but here in case of online submission problems)
 	
 run_analysis.R
 
